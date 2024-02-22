@@ -82,8 +82,8 @@ def slack_actions():
         return "Internal Server Error", 500
 
 
-@app.route('/notifications', methods=['GET'])
-def slack_actions():
+@app.route('slack/notifications', methods=['GET'])
+def send_notifications():
     df_moving_averages = fetch_moving_averages()
     if df_moving_averages is not None and not df_moving_averages.empty:
         analyze_videos(df_moving_averages)

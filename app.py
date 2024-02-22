@@ -4,6 +4,8 @@ import logging
 import os
 from slack_sdk import WebClient
 import urllib.parse
+from main import fetch_moving_averages, analyze_videos
+
 
 app = Flask(__name__)
 
@@ -78,6 +80,17 @@ def slack_actions():
     except Exception as e:
         print(e)
         return "Internal Server Error", 500
+
+
+@app.route('slack/notification', methods=['GET'])
+def slack_actions():
+    df_moving_averages = fetch_moving_averages()
+    if df_moving_averages is not None and not df_moving_averages.empty:
+        analyze_videos(df_moving_averages)
+        return jsonify({'status': 'Notification sent'})
+
+    else:
+        return jsonify({'status': 'No moving averages found to analyze'})
 
 
 if __name__ == '__main__':

@@ -82,7 +82,7 @@ def slack_actions():
         return "Internal Server Error", 500
 
 
-@app.route('/slack/notifications', methods=['GET'])
+@app.route('/notifications', methods=['GET'])
 def slack_actions():
     df_moving_averages = fetch_moving_averages()
     if df_moving_averages is not None and not df_moving_averages.empty:

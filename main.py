@@ -265,6 +265,7 @@ def upload_to_s3(bucket_name, s3_file_name, data):
         return None
     
  
+ 
 def send_slack_alert(video_id, group, trend_status):
     title, video_url, image_public_url, message_text = None, None, None, None
     try:

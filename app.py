@@ -41,6 +41,8 @@ def alert_sent():
     return jsonify({'status': 'Received'})
 
 
+
+
 @app.route('/slack/actions', methods=['POST'])
 def slack_actions():
     encoded_payload = request.get_data(as_text=True)

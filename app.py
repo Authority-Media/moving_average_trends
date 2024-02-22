@@ -1,11 +1,18 @@
 from flask import Flask, request, jsonify
 import json
 import logging
+import os
+from slack_sdk import WebClient
+import urllib.parse
 
 app = Flask(__name__)
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
+
+SLACK_BOT_TOKEN = os.getenv('SLACK_BOT_TOKEN')
+
+slack_client = WebClient(token=SLACK_BOT_TOKEN)
 
 @app.route('/slack/interactivity-endpoint', methods=['POST'])
 def interactivity_endpoint():
@@ -32,6 +39,46 @@ def alert_sent():
     data = request.json  # Assuming main.py sends a JSON payload
     logging.info(f"Alert sent: {data}")
     return jsonify({'status': 'Received'})
+
+
+
+
+@app.route('/slack/actions', methods=['POST'])
+def slack_actions():
+    encoded_payload = request.get_data(as_text=True)
+    decoded_payload = urllib.parse.unquote(encoded_payload)
+    payload_str = decoded_payload.split("payload=")[1]
+    payload_dict = json.loads(payload_str)
+    trigger_id = payload_dict['trigger_id']
+    try:
+        response = slack_client.views_open(
+            trigger_id=trigger_id, 
+            view={
+                "type": "modal",
+                "title": {
+                    "type": "plain_text",
+                    "text": "Details"
+                },
+                "blocks": [
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": " "
+                        }
+                    }
+                ]
+            }
+        )
+
+        if not response["ok"]:
+            raise ValueError(f"Failed to open modal: {response['error']}")
+
+        return "", 200 
+    except Exception as e:
+        print(e)
+        return "Internal Server Error", 500
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=8080)

@@ -160,7 +160,6 @@ def analyze_videos(df):
 
     # Initialize the progress bar
     pbar = tqdm(total=len(df['video_id'].unique()), desc="Analyzing Videos", unit="video")
-
     for video_id, group in df.groupby('video_id'):
         group_sorted = group.sort_values(by='date', ascending=True)
         
@@ -265,7 +264,8 @@ def upload_to_s3(bucket_name, s3_file_name, data):
         print("Credentials not available")
         return None
     
-    
+ 
+ 
 def send_slack_alert(video_id, group, trend_status):
     title, video_url, image_public_url, message_text = None, None, None, None
     try:
@@ -310,7 +310,8 @@ def send_slack_alert(video_id, group, trend_status):
                             "name": "details",
                             "text": "View Details",
                             "type": "button",
-                            "value": "view_details"
+                            "value": "view_details",
+                            "action_id": "open_modal"
                         }
                     ]
                 },
@@ -321,6 +322,8 @@ def send_slack_alert(video_id, group, trend_status):
                 }
             ]
         }
+
+
     except Exception as e:
         log_error_to_flask(e, video_id, "Error while constructing Slack message")
         return  # Stop further processing if we encounter an error here
@@ -329,7 +332,6 @@ def send_slack_alert(video_id, group, trend_status):
         # Send the message using the Slack API
         headers = {'Authorization': f'Bearer {SLACK_BOT_TOKEN}', 'Content-Type': 'application/json'}
         response = requests.post('https://slack.com/api/chat.postMessage', headers=headers, json=slack_message)
-        
         # Check for successful response
         if response.status_code == 200:
             log_alert_to_flask({'text': message_text, 'video_id': video_id, 'trend_status': trend_status})
@@ -339,6 +341,7 @@ def send_slack_alert(video_id, group, trend_status):
         # Log the exception to the Flask app
         log_error_to_flask(e, video_id, "Error while sending Slack message")
         print(f"An error occurred while sending the Slack alert: {e}")
+
 
 def log_error_to_flask(exception, video_id, context):
     # Replace with your Flask app's URL when using ngrok

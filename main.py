@@ -310,7 +310,7 @@ def send_slack_alert(video_id, group, trend_status):
                             "name": "details",
                             "text": "View Details",
                             "type": "button",
-                            "value": "view_details",
+                            "value": video_id,
                             "action_id": "open_modal"
                         }
                     ]

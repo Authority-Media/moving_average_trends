@@ -52,26 +52,31 @@ def slack_actions():
     payload_str = decoded_payload.split("payload=")[1]
     payload_dict = json.loads(payload_str)
     trigger_id = payload_dict['trigger_id']
+    actions = payload_dict['actions']
+    video_id = actions[0]['value']  # Retrieve the video_id from the button's value
+
+    # Optional: Retrieve the video URL from the database if additional metadata is needed
+    # video_url = get_video_url(video_id)
+
     try:
-        response = slack_client.views_open(
-            trigger_id=trigger_id, 
-            view={
-                "type": "modal",
-                "title": {
-                    "type": "plain_text",
-                    "text": "Details"
-                },
-                "blocks": [
-                    {
-                        "type": "section",
-                        "text": {
-                            "type": "mrkdwn",
-                            "text": " "
-                        }
-                    }
-                ]
-            }
-        )
+        # Construct the view with the video block
+        view = {
+            "type": "modal",
+            "title": {
+                "type": "plain_text",
+                "text": "Video Details"
+            },
+            "blocks": [
+                {
+                    "type": "video",
+                    "video_url": f"https://www.youtube.com/embed/{video_id}?feature=oembed&autoplay=1",
+                    "alt_text": "Embedded Video"
+                }
+                # ... additional blocks as needed ...
+            ]
+        }
+
+        response = slack_client.views_open(trigger_id=trigger_id, view=view)
 
         if not response["ok"]:
             raise ValueError(f"Failed to open modal: {response['error']}")

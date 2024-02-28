@@ -364,8 +364,8 @@ def send_slack_alert():
                             "name": "details",
                             "text": "View Details",
                             "type": "button",
-                            "value": "view_details",  # This value will be sent to your server when the button is clicked
-                            "action_id": "open_modal"  # This action_id will be used to identify which action was triggered
+                            "value": video_id,
+                            "action_id": "open_modal"
                         }
                     ]
                 },

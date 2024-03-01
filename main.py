@@ -85,6 +85,7 @@ def update_trending_videos(trending_videos):
             conn.close()
 
 
+
 def fetch_moving_averages():
     print("Fetching moving averages from the database...")
     try:
@@ -264,6 +265,7 @@ def upload_to_s3(bucket_name, s3_file_name, data):
         print("Credentials not available")
         return None
     
+ 
  
  
 def send_slack_alert(video_id, group, trend_status):

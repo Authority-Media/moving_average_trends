@@ -266,93 +266,39 @@ def upload_to_s3(bucket_name, s3_file_name, data):
     
  
  
-# def send_slack_alert(video_id, group, trend_status):
-#     title, video_url, image_public_url, message_text = None, None, None, None
-#     try:
-#         title = group['video_title'].iloc[0]
-#         video_url = get_video_url(video_id)
-#         graph_image = plot_moving_average(group, title, show=False)
-#     except Exception as e:
-#         log_error_to_flask(e, video_id, "Error while preparing alert data")
-#         return  # Stop further processing if we encounter an error here
-
-#     try:
-#         # Generate a filename for the image
-#         s3_file_name = f"{video_id}_trend.png"
-        
-#         # Upload the image to cloud storage and get the public URL
-#         image_public_url = upload_to_s3('graphlinestorage', s3_file_name, graph_image)
-#     except Exception as e:
-#         log_error_to_flask(e, video_id, "Error while uploading image to S3")
-#         return  # Stop further processing if we encounter an error here
-
-#     try:
-#         # Construct the message based on the trend status
-#         if trend_status == 'new':
-#             message_text = f"New Trending Video Alert: *{title}*"
-#         elif trend_status == 'up':
-#             message_text = f"Continuing to Trend Upwards: *{title}*"
-#         else:
-#             message_text = f"Starting to Trend Downwards: *{title}*"
-
-#         # Prepare the Slack message payload
-#         slack_message = {
-#             "channel": "C06JLDF1MNH",  # Replace with your actual channel ID
-#             "text": f"Trending Alert: *{title}*",
-#             "attachments": [
-#                 {
-#                     "fallback": "You are unable to choose a game",
-#                     "callback_id": "modal_open",
-#                     "color": "#3AA3E3",
-#                     "attachment_type": "default",
-#                     "actions": [
-#                         {
-#                             "name": "details",
-#                             "text": "View Details",
-#                             "type": "button",
-#                             "value": "view_details",
-#                             "action_id": "open_modal"
-#                         }
-#                     ]
-#                 },
-#                 {
-#                     "title": title,
-#                     "title_link": video_url,
-#                     "image_url": image_public_url
-#                 }
-#             ]
-#         }
-
-
-#     except Exception as e:
-#         log_error_to_flask(e, video_id, "Error while constructing Slack message")
-#         return  # Stop further processing if we encounter an error here
-
-#     try:
-#         # Send the message using the Slack API
-#         headers = {'Authorization': f'Bearer {SLACK_BOT_TOKEN}', 'Content-Type': 'application/json'}
-#         response = requests.post('https://slack.com/api/chat.postMessage', headers=headers, json=slack_message)
-#         # Check for successful response
-#         if response.status_code == 200:
-#             log_alert_to_flask({'text': message_text, 'video_id': video_id, 'trend_status': trend_status})
-#         else:
-#             raise ValueError(f"Request to Slack API returned an error {response.status_code}, the response is:\n{response.text}")
-#     except Exception as e:
-#         # Log the exception to the Flask app
-#         log_error_to_flask(e, video_id, "Error while sending Slack message")
-#         print(f"An error occurred while sending the Slack alert: {e}")
-def send_slack_alert():
-    title = "Sample Video Title"
-    video_url = "https://www.youtube.com/watch?v=tLuhqBfcixs"
-    image_public_url = "https://graphlinestorage.s3.amazonaws.com/bOBCmlrfaQQ_trend.png"
-    message_text = "Trending Alert: *Sample Video Title*"
-    video_id = "sample_video_id"
+def send_slack_alert(video_id, group, trend_status):
+    title, video_url, image_public_url, message_text = None, None, None, None
+    try:
+        title = group['video_title'].iloc[0]
+        video_url = get_video_url(video_id)
+        graph_image = plot_moving_average(group, title, show=False)
+    except Exception as e:
+        log_error_to_flask(e, video_id, "Error while preparing alert data")
+        return  # Stop further processing if we encounter an error here
 
     try:
+        # Generate a filename for the image
+        s3_file_name = f"{video_id}_trend.png"
+        
+        # Upload the image to cloud storage and get the public URL
+        image_public_url = upload_to_s3('graphlinestorage', s3_file_name, graph_image)
+    except Exception as e:
+        log_error_to_flask(e, video_id, "Error while uploading image to S3")
+        return  # Stop further processing if we encounter an error here
+
+    try:
+        # Construct the message based on the trend status
+        if trend_status == 'new':
+            message_text = f"New Trending Video Alert: *{title}*"
+        elif trend_status == 'up':
+            message_text = f"Continuing to Trend Upwards: *{title}*"
+        else:
+            message_text = f"Starting to Trend Downwards: *{title}*"
+
         # Prepare the Slack message payload
         slack_message = {
             "channel": "C06JLDF1MNH",  # Replace with your actual channel ID
-            "text": message_text,
+            "text": f"Trending Alert: *{title}*",
             "attachments": [
                 {
                     "fallback": "You are unable to choose a game",
@@ -364,7 +310,7 @@ def send_slack_alert():
                             "name": "details",
                             "text": "View Details",
                             "type": "button",
-                            "value": video_id,
+                            "value": "view_details",
                             "action_id": "open_modal"
                         }
                     ]
@@ -377,17 +323,25 @@ def send_slack_alert():
             ]
         }
 
+
+    except Exception as e:
+        log_error_to_flask(e, video_id, "Error while constructing Slack message")
+        return  # Stop further processing if we encounter an error here
+
+    try:
         # Send the message using the Slack API
         headers = {'Authorization': f'Bearer {SLACK_BOT_TOKEN}', 'Content-Type': 'application/json'}
         response = requests.post('https://slack.com/api/chat.postMessage', headers=headers, json=slack_message)
-        
         # Check for successful response
-        if response.status_code != 200:
+        if response.status_code == 200:
+            log_alert_to_flask({'text': message_text, 'video_id': video_id, 'trend_status': trend_status})
+        else:
             raise ValueError(f"Request to Slack API returned an error {response.status_code}, the response is:\n{response.text}")
     except Exception as e:
+        # Log the exception to the Flask app
+        log_error_to_flask(e, video_id, "Error while sending Slack message")
         print(f"An error occurred while sending the Slack alert: {e}")
 
-send_slack_alert()
 
 def log_error_to_flask(exception, video_id, context):
     # Replace with your Flask app's URL when using ngrok

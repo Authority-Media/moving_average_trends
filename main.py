@@ -14,6 +14,8 @@ import boto3
 from botocore.exceptions import NoCredentialsError
 import matplotlib.pyplot as plt
 import datetime
+import cloudinary
+import cloudinary.uploader
 
 
 
@@ -34,6 +36,13 @@ db_params = {
 slack_webhook_url = os.environ.get('SLACK_WEBHOOK_URL')
 
 SLACK_BOT_TOKEN = os.getenv('SLACK_BOT_TOKEN')
+
+# Configuring Cloudinary to store graphs and get an url to access the graph
+cloudinary.config(
+    cloud_name=os.getenv('CLOUDINARY_CLOUD_NAME'),
+    api_key=os.getenv('CLOUDINARY_API_KEY'),
+    api_secret=os.getenv('CLOUDINARY_API_SECRET')
+)
 
 def alert_already_sent(cursor, video_id, trend_status):
     # Check if an alert with the same trend status has already been sent for this video_id
@@ -62,6 +71,7 @@ def get_video_url(video_id):
 
 
 def update_trending_videos(trending_videos):
+    #Updates the current_trending_videos table 
     try:
         conn = psycopg2.connect(**db_params)
         cursor = conn.cursor()
@@ -83,7 +93,6 @@ def update_trending_videos(trending_videos):
         if conn:
             cursor.close()
             conn.close()
-
 
 
 def fetch_moving_averages():
@@ -254,53 +263,45 @@ def update_trending_videos_database(cursor, video_id, last_moving_average, trend
         print(f"An error occurred while updating the trending videos: {e}")
 
 
-def upload_to_s3(bucket_name, s3_file_name, data):
-    s3 = boto3.client('s3',
-                      aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
-                      aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'))
+def upload_to_cloudinary(image_data):
+    """Upload an image to Cloudinary and return the image URL."""
     try:
-        s3.upload_fileobj(data, bucket_name, s3_file_name)
-        return f"https://{bucket_name}.s3.amazonaws.com/{s3_file_name}"
-    except NoCredentialsError:
-        print("Credentials not available")
+        response = cloudinary.uploader.upload(image_data)
+        return response.get('url')
+    except Exception as e:
+        print(f"An error occurred while uploading to Cloudinary: {e}")
         return None
     
- 
- 
- 
-def send_slack_alert(video_id, group, trend_status):
+
+def send_slack_alert(video_id, group):
+    # Retrieves the video url, the title, uploads moving_average graph to Cloudinary and build the message to Slack.
     title, video_url, image_public_url, message_text = None, None, None, None
-    try:
-        title = group['video_title'].iloc[0]
-        video_url = get_video_url(video_id)
-        graph_image = plot_moving_average(group, title, show=False)
-    except Exception as e:
-        log_error_to_flask(e, video_id, "Error while preparing alert data")
-        return  # Stop further processing if we encounter an error here
+    title = group['video_title'].iloc[0]
+    video_url = get_video_url(video_id)
+    message_text = f"Trending Alert: *{title}*"
+
+    # Generate the plot and get the BytesIO object
+    image_data = plot_moving_average(group, title, show=False)
+
+    if image_data:
+        # Upload the generated image to Cloudinary and get the public URL
+        image_public_url = upload_to_cloudinary(image_data)
+
+        # Close the BytesIO object after uploading
+        image_data.close()
+
+        if not image_public_url:
+            print("Failed to upload image to Cloudinary.")
+            return  # Exit the function if the upload failed
+    else:
+        print("Failed to generate the image.")
+        return
 
     try:
-        # Generate a filename for the image
-        s3_file_name = f"{video_id}_trend.png"
-        
-        # Upload the image to cloud storage and get the public URL
-        image_public_url = upload_to_s3('graphlinestorage', s3_file_name, graph_image)
-    except Exception as e:
-        log_error_to_flask(e, video_id, "Error while uploading image to S3")
-        return  # Stop further processing if we encounter an error here
-
-    try:
-        # Construct the message based on the trend status
-        if trend_status == 'new':
-            message_text = f"New Trending Video Alert: *{title}*"
-        elif trend_status == 'up':
-            message_text = f"Continuing to Trend Upwards: *{title}*"
-        else:
-            message_text = f"Starting to Trend Downwards: *{title}*"
-
-        # Prepare the Slack message payload
+        # Prepare the Slack message payload with the Cloudinary image URL
         slack_message = {
             "channel": "C06JLDF1MNH",  # Replace with your actual channel ID
-            "text": f"Trending Alert: *{title}*",
+            "text": message_text,
             "attachments": [
                 {
                     "fallback": "You are unable to choose a game",
@@ -312,7 +313,7 @@ def send_slack_alert(video_id, group, trend_status):
                             "name": "details",
                             "text": "View Details",
                             "type": "button",
-                            "value": "view_details",
+                            "value": video_id,
                             "action_id": "open_modal"
                         }
                     ]
@@ -320,30 +321,22 @@ def send_slack_alert(video_id, group, trend_status):
                 {
                     "title": title,
                     "title_link": video_url,
-                    "image_url": image_public_url
+                    "image_url": image_public_url  # Use the URL from Cloudinary
                 }
             ]
         }
 
-
-    except Exception as e:
-        log_error_to_flask(e, video_id, "Error while constructing Slack message")
-        return  # Stop further processing if we encounter an error here
-
-    try:
         # Send the message using the Slack API
         headers = {'Authorization': f'Bearer {SLACK_BOT_TOKEN}', 'Content-Type': 'application/json'}
         response = requests.post('https://slack.com/api/chat.postMessage', headers=headers, json=slack_message)
+        
         # Check for successful response
-        if response.status_code == 200:
-            log_alert_to_flask({'text': message_text, 'video_id': video_id, 'trend_status': trend_status})
-        else:
+        if response.status_code != 200:
             raise ValueError(f"Request to Slack API returned an error {response.status_code}, the response is:\n{response.text}")
     except Exception as e:
-        # Log the exception to the Flask app
-        log_error_to_flask(e, video_id, "Error while sending Slack message")
         print(f"An error occurred while sending the Slack alert: {e}")
 
+send_slack_alert()
 
 def log_error_to_flask(exception, video_id, context):
     # Replace with your Flask app's URL when using ngrok
@@ -371,22 +364,27 @@ def log_alert_to_flask(alert_data):
         print(f"Failed to log alert: {response.status_code}, {response.text}")
 
 def plot_moving_average(group, title, show=True):
-    plt.figure(figsize=(10, 6))
-    plt.plot(group['date'], group['moving_average'], marker='o', linestyle='-', color='b')
-    plt.title(title)
-    plt.xlabel('Date')
-    plt.ylabel('Moving Average of Views')
-    plt.xticks(rotation=45)
-    plt.tight_layout()
+    try:
+        plt.figure(figsize=(10, 6))
+        plt.plot(group['date'], group['moving_average'], marker='o', linestyle='-', color='b')
+        plt.title(title)
+        plt.xlabel('Date')
+        plt.ylabel('Moving Average of Views')
+        plt.xticks(rotation=45)
+        plt.tight_layout()
 
-    if show:
-        plt.show()
-    else:
-        img_buf = BytesIO()
-        plt.savefig(img_buf, format='png')
-        plt.close()
-        img_buf.seek(0)
-        return img_buf
+        if show:
+            plt.show()
+        else:
+            img_buf = BytesIO()
+            plt.savefig(img_buf, format='png')
+            plt.close()  # Ensure the figure is closed after saving to buffer
+            img_buf.seek(0)
+            return img_buf
+    except Exception as e:
+        print(f"An error occurred while generating the plot: {e}")
+        plt.close()  # Ensure the figure is closed in case of an error
+        return None
 
 
 

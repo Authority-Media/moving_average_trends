@@ -182,7 +182,7 @@ def analyze_videos(df):
                 continue
             # If alert not sent, append to trending_videos and send alert
             trending_videos.append(trend_status_result)
-            send_slack_alert(video_id, group, trend_status)  # Send alert for each trending video
+            send_slack_alert(video_id, group)  # Send alert for each trending video
             update_trending_videos_database(cursor, video_id, group['moving_average'].iloc[-1], trend_status)
 
         pbar.update(1)  # Update the progress for each video
@@ -336,7 +336,6 @@ def send_slack_alert(video_id, group):
     except Exception as e:
         print(f"An error occurred while sending the Slack alert: {e}")
 
-send_slack_alert()
 
 def log_error_to_flask(exception, video_id, context):
     # Replace with your Flask app's URL when using ngrok
